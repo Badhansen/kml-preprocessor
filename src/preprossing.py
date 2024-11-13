@@ -6,37 +6,37 @@ from lxml import etree
 
 
 def extract_details_from_kml(file_path):
-    with open(file_path) as f:
+    # print(f"Reading file: {file_path}")
+    with open(file_path, encoding='utf-8') as f:
         doc = parser.parse(f)
-
+    
     polygons = {}
     
+    # Iterate through all Placemark elements in the KML file
     for placemark in doc.findall('.//{http://www.opengis.net/kml/2.2}Placemark'):
         # Get placemark name
-        placemark_name = placemark.name.text.strip() if placemark.name is not None else "Unnamed Placemark"
+        placemark_name = placemark.find('{http://www.opengis.net/kml/2.2}name')
+        placemark_name = placemark_name.text.strip() if placemark_name is not None else "Unnamed Placemark"
         
         # Check if the placemark contains a polygon
         polygon = placemark.find('.//{http://www.opengis.net/kml/2.2}Polygon')
         if polygon is not None:
             # Extract coordinates of the polygon
-            coordinates = polygon.outerBoundaryIs.LinearRing.coordinates.text.strip()
+            coordinates = polygon.find('.//{http://www.opengis.net/kml/2.2}coordinates').text.strip()
             # Split the coordinates string into individual points
             points = coordinates.split()
-            # polygons[placemark_name] = coordinates
-            # # Print the placemark name
-            # print("Placemark:", placemark_name)
-            # # Print the points of the polygon
-            # print("Polygon:")
             polygon_points = []
             for point in points:
                 lon, lat, _ = point.split(',')
                 polygon_points.append((lon, lat))
-                # print(f"Longitude: {lon}, Latitude: {lat}")
+            # Store the placemark name and associated polygon points
             polygons[placemark_name] = polygon_points
 
-    random_key = random.choice(list(polygons.keys()))
-    # print(polygons[random_key])
-    # print('Total polygons: ', len(polygons))
+    print(f'Total polygons found: {len(polygons)}')
+    
+    # Check if we found polygons
+    if len(polygons) == 0:
+        print("No polygons found in the KML file.")
     return polygons
 
 def create_kml_from_placemark_polygons(placemark_data, file_path):
@@ -76,22 +76,31 @@ def create_kml_from_placemark_polygons(placemark_data, file_path):
     with open(file_path, 'wb') as f:
         f.write(kml_string)
 
-    print("KML file saved as " + file_name)
+    print("KML file saved as " + filename)
 
 
 if __name__ == "__main__":
     folder_name = 'data'
-    original_file_name = "DUBLIN_ORG.kml"
-    file_name = "Dublin.kml"
-    current_directory  = os.getcwd()
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    # print(script_directory)
+    # Navigate up one level from the current directory (.. takes you up one level)
+    parent_directory = os.path.dirname(script_directory)
+    # print(parent_directory)
     # Construct the full folder path
-    folder_path = os.path.join(current_directory, folder_name)
-    # Create the folder if it doesn't exist
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+    folder_path = os.path.join(parent_directory, folder_name)
+    unprocessed_map_path = os.path.join(folder_path, "Small_area_maps")
 
-    original_file_path = os.path.join(folder_path, original_file_name)
-    save_file_path =  os.path.join(folder_path, file_name)
-    
-    data = extract_details_from_kml(original_file_path)
-    create_kml_from_placemark_polygons(data, save_file_path)
+    processed_map_path = os.path.join(folder_path, "processed_map")
+    if not os.path.exists(processed_map_path):
+        # print(folder_path)
+        os.makedirs(processed_map_path)
+    else:
+        print(processed_map_path)
+
+    files = [os.path.join(unprocessed_map_path, f) for f in os.listdir(unprocessed_map_path) if os.path.isfile(os.path.join(unprocessed_map_path, f))]
+    for file_path in files:
+        filename = os.path.basename(file_path)
+        print(file_path)
+        data = extract_details_from_kml(file_path)
+        save_file_path =  os.path.join(processed_map_path, filename)
+        create_kml_from_placemark_polygons(data, save_file_path)
